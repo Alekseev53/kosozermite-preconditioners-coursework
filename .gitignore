@@ -1,0 +1,21 @@
+# Visual Studio Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Other common files
+*.log
+*.swp
+*.bak
+
+venv/
