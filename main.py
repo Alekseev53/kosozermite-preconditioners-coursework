@@ -1,4 +1,4 @@
-
+from scipy.linalg import null_space
 #\section*{Введение}
 #12 - 26
 
@@ -273,12 +273,6 @@ def B_omega(omega, B_e, K_l, K_u):
     """
     return np.linalg.inv(B_e + (omega / 2) * K_l) @ (B_e + (omega / 2) * K_u)
 
-def B_omega_parametric(omega1, omega2, B_e, K_l, K_u):
-    """
-    Вычисление матрицы B(ω1, ω2) по заданной формуле.
-    """
-    return np.linalg.inv(B_e + omega1 * K_l) @ (B_e + omega2 * K_u)
-
 def G(v, tau, B_omega, A):
     """
     Вычисление матрицы G(v, τ) по заданной формуле.
@@ -297,6 +291,28 @@ def PTTKM_method(v0, h, tau, A, b, B_e, K_l, K_u, max_iter=100):
         v.append(v_next)
     return v
 
+def B_omega_parametric(omega1, omega2, B_e, K_l, K_u):
+    """
+    Вычисление матрицы B(ω1, ω2) по заданной формуле.
+    
+    Параметры:
+    - omega1, omega2: неотрицательные параметры, не равные нулю одновременно.
+    - B_e: симметричная положительно определенная матрица.
+    - K_l, K_u: матрицы, соответствующие определению.
+    
+    Возвращает:
+    - Матрицу B(ω1, ω2)
+    """
+    # Проверка параметров omega1 и omega2
+    if omega1 < 0 or omega2 < 0:
+        raise ValueError("Both omega1 and omega2 should be non-negative.")
+    if omega1 == 0 and omega2 == 0:
+        raise ValueError("Both omega1 and omega2 cannot be zero simultaneously.")
+    
+    return np.linalg.inv(B_e + omega1 * K_l) @ (B_e + omega2 * K_u)
+
+
+
 # Простой пример использования
 # Начальные параметры
 n = 4
@@ -304,6 +320,11 @@ v0 = np.array([1, 1, 1, 1])
 h = 0.1
 tau = 0.01
 B_e_example = np.eye(n)  # Просто единичная матрица в качестве примера
+# Простой тест функции с проверкой
+try:
+    B_omega_parametric(-1, 1, B_e_example, np.eye(n), np.eye(n))
+except ValueError as e:
+    test_output = str(e)
 
 # Применение метода
 v_sequence = PTTKM_method(v0, h, tau, A_example, \
@@ -315,7 +336,227 @@ print(v_sequence[:5])
 
 #Третий лист
 
+"""
+% Insert the provided content below
+В [7, 8] предложен и двухшаговый координатный итерационный метод (ДКМ), даны достаточные условия сходимости метода и выбор оптимальных итерационных параметров. Матрица \( B(\omega) \) для ДКМ имеет вид
+\[ B(\omega) = \left(B_c + \frac{\omega}{2} K_L\right)B_E \left(B_c + \frac{\omega}{2} K_U\right), \]
+где \( K_L = K_L + H_0, K_U = K_U - H_0 \). Но \( B_c = C_{\times} \) – некоторая разряженная матрица, \( B_E = C_{\times} \) – зрящая по локально квазиточно определенная матрица. Очевидно, что \( K_L = -K_U; A = (K_L + H_0) + (K_U - H_0) = K_L + K_U \). 
+В случае, когда \( H_0 = 0 \), ДКМ сводится к ИТКМ, специальный выбор матрицы \( H_0 \) позволяет улучшить сходимость метода.
+В [9] впервые предложен обобщенный разряженный треугольный метод GSTS (Generalized Skew-Hermitian Triangular Splitting) для решения основных СЛАУ, блочно-структурированных матриц которых имеет положительно определенный (1, 1) блок.
+В данной работе исследуются свойства матрицы \( B(\omega) \) (6), используя в качестве предобусловленной матрицы матрицу СЛАУ (1). Исследованы задачи рассмотрены более общий случай, когда (1, 1) матричный блок близко кнонструктуре портфолио СЛАУ с такой матрицей используется метод расширенного Лагранжиана. Доказана теорема о распределении спектра матрицы \( B^{-1}(\omega_1, \omega_2) \). Для предобусловливателя \( B(\omega_1, \omega_2) \) есть обобщение \( B(\omega_1, \omega_2) \) (5) для основных задач.
+"""
+
+def B_omega_DKM(omega, B_c, B_e, K_L, K_U):
+    """
+    Вычисление матрицы B(ω) для ДКМ по заданной формуле.
+    """
+    return (B_c + (omega / 2) * K_L) @ B_e @ (B_c + (omega / 2) * K_U)
+
+def update_K_matrices(K_L, H_0):
+    """
+    Обновление матриц K_L и K_U на основе матрицы H_0.
+    """
+    K_L_updated = K_L + H_0
+    K_U_updated = -K_L_updated
+    return K_L_updated, K_U_updated
+
+def compute_A_from_K(K_L, K_U, H_0):
+    """
+    Вычисление матрицы A на основе матриц K_L и K_U.
+    """
+    return (K_L + H_0) + (K_U - H_0)
+
+# Простые тесты
+# Допустим, у нас есть следующие матрицы:
+B_c_example = np.eye(n) * 2
+B_e_example = np.eye(n)
+K_L_example = np.eye(n)
+H_0_example = np.zeros((n, n))
+
+K_L_updated, K_U_updated = update_K_matrices(K_L_example, H_0_example)
+A_example = compute_A_from_K(K_L_updated, K_U_updated, H_0_example)
+B_omega_DKM_example = B_omega_DKM(0.5, B_c_example, B_e_example, K_L_updated, K_U_updated)
+
+print(B_omega_DKM_example)
+
+
+"""
+\section*{Предобусловливание СЛАУ с седловой матрицей}
+
+Характерно к задачей, приводящих к решению СЛАУ с седловой матрицей, является следующая задача квадратного программирования: необходимо найти минимум \( J(u) \) на утверждении \( J(u) = \frac{1}{2}u^* E u - u^* f \) при наличии \( q \leq p \) линейных ограничений \( E u = g \):
+\[
+\begin{aligned}
+\left( \begin{array}{cc}
+M & E^* \\
+E & 0 
+\end{array} \right)
+\left( \begin{array}{c}
+u \\
+\lambda
+\end{array} \right)
+= 
+\left( \begin{array}{c}
+f \\
+g
+\end{array} \right),
+\end{aligned}
+\]
+где \( M = M^* = C_{\times} \) – положительно определенная матрица, \( E \) ∈ \( C^{q \times p} \) – произвольная матрица полного ранга, \( q \leq p \), \( u \) ∈ \( C^p \), \( g \) ∈ \( C^q \). Данной задаче соответствует функционал Лагранжа \( L(u, \lambda) = J(u) + \mu^* (E u - g) \), где \( \mu \) – вектор Лагранжевых множителей. Заметим, что матрица блочно-структурованной СЛАУ (7) неотрицательна тогда и только тогда, когда [10]:
+\[
+\begin{aligned}
+\text{rank}(E^*) = q, \\
+\text{ker}(E) \cap \text{ker}(M) = \{0\}.
+\end{aligned}
+\]
+"""
+
+def saddle_point_system(M, E, f, g):
+    """
+    Формирование СЛАУ с седловой матрицей.
+    """
+    matrix = np.block([
+        [M, E.T],
+        [E, np.zeros((E.shape[0], E.shape[0]))]
+    ])
+    
+    rhs = np.concatenate([f, g])
+    
+    return matrix, rhs
+
+def lagrangian_functional(u, mu, E, f, g, M):
+    """
+    Функционал Лагранжа L(u, λ).
+    """
+    J = 0.5 * u.conj().T @ M @ u - u.conj().T @ f
+    return J + mu.conj().T @ (E @ u - g)
+
+def check_matrix_conditions(E, M):
+    """
+    Проверка условий на неотрицательность матрицы блочно-структурированной СЛАУ из [10].
+    """
+    rank_E_star = np.linalg.matrix_rank(E.T)
+    ker_E = null_space(E)
+    ker_M = null_space(M)
+    
+    intersection = np.isclose(ker_E, ker_M).all()
+    
+    return rank_E_star == E.shape[0] and not intersection
+
+# Пример использования
+M_example = np.array([[2, 0], [0, 3]])
+E_example = np.array([[1, 1]])
+f_example = np.array([1, 2])
+g_example = np.array([1])
+
+matrix, rhs = saddle_point_system(M_example, E_example, f_example, g_example)
+L_example = lagrangian_functional(np.array([1, 1]), np.array([1]), E_example, f_example, g_example, M_example)
+conditions_met = check_matrix_conditions(E_example, M_example)
+
+print(matrix, rhs, L_example, conditions_met)
+
+
+
 #Четвертый лист
+
+r"""
+\text{Преобразуем } (3) \text{ к эквивалентной неявной СЛАУ, матрица которой имеет сектр, дежавный и право и поу полоскости } [11]:
+\begin{equation}
+\begin{pmatrix}
+M & E^* \\
+-E & 0 \\
+\end{pmatrix}
+\begin{pmatrix}
+u \\
+\mu \\
+\end{pmatrix}
+=
+\begin{pmatrix}
+f \\
+-g \\
+\end{pmatrix}
+. (8)
+\end{equation}
+
+\text{Рассмотрим случай, когда } (1,1) \text{ маргиналь блок полурегелен или вырожден. Будем использовать метод расширенно Лагранжиана, который состоит в замене } (8) \text{ на СЛАУ}
+\begin{equation}
+\Delta w =
+\begin{pmatrix}
+M & E^* \\
+-E & 0 \\
+\end{pmatrix}
+\begin{pmatrix}
+u \\
+\mu \\
+\end{pmatrix}
+=
+\begin{pmatrix}
+f + \gamma E^*g \\
+-g \\
+\end{pmatrix}
+= F, (9)
+\end{equation}
+\text{в которой } M \text{ заменяется матрицу } M = M + \gamma E^*E, \text{ являющуюся положительно определенной для всех } \gamma > 0, \text{ если } M \text{ имеет полный ранг. Очевидно, что } (9) \text{ имеет тоже самое решение, что и } (8). \text{Наиболее эффективный выбор } \gamma = ||M||_2/||E||_2 [12]. \text{В этом случае число обусловленности как } (1,1) \text{ блока, так и всей матрицы коэффициентов является наименьшим.}
+\text{Представим матрицу } A \text{ из } (9), \text{ аналогично } (2), \text{ в виде суммы ее эрмитовой и коэрмитовой составляющих:}
+
+A = A_0 + A_1, \quad A_0 = \begin{pmatrix} M & 0 \\ 0 & E^* \end{pmatrix}, \quad A_1 = \begin{pmatrix} 0 & E^* \\ -E & 0 \end{pmatrix}.
+"""
+def implicit_system(M, E, f, g):
+    """
+    Формирование неявной СЛАУ (8).
+    """
+    matrix = np.block([
+        [M, E.T],
+        [-E, np.zeros((E.shape[0], E.shape[0]))]
+    ])
+    
+    rhs = np.concatenate([f, -g])
+    
+    return matrix, rhs
+
+def extended_lagrangian_system(M, E, f, g, gamma):
+    """
+    Применение метода расширенного Лагранжиана для получения системы (9).
+    """
+    M_modified = M + gamma * E.T @ E
+    rhs_modified = np.concatenate([f + gamma * E.T @ g, -g])
+    
+    matrix = np.block([
+        [M_modified, E.T],
+        [-E, np.zeros((E.shape[0], E.shape[0]))]
+    ])
+    
+    return matrix, rhs_modified
+
+def decompose_matrix_A(M, E):
+    """
+    Разделение матрицы A на её эрмитовую и коэрмитовую составляющие.
+    """
+    A0 = np.block([
+        [M, np.zeros((M.shape[0], E.shape[0]))],
+        [np.zeros((E.shape[0], M.shape[1])), np.zeros((E.shape[0], E.shape[0]))]
+    ])
+    
+    A1 = np.block([
+        [np.zeros_like(M), E.T],
+        [-E, np.zeros((E.shape[0], E.shape[0]))]
+    ])
+    
+    return A0, A1
+
+# Простой тест
+M_example = np.array([[2, 0], [0, 3]])
+E_example = np.array([[1, 1]])
+f_example = np.array([1, 2])
+g_example = np.array([1])
+gamma_example = np.linalg.norm(M_example, 2) / np.linalg.norm(E_example, 2)
+
+matrix_8, rhs_8 = implicit_system(M_example, E_example, f_example, g_example)
+matrix_9, rhs_9 = extended_lagrangian_system(M_example, E_example, f_example, g_example, gamma_example)
+A0_example, A1_example = decompose_matrix_A(M_example, E_example)
+
+print(matrix_8, rhs_8, matrix_9, rhs_9, A0_example, A1_example)
+
+
 
 #Пятый лист
 
@@ -394,6 +635,12 @@ def schur_complement(A):
     # Вычисление дополнения Шура
     S = W - Z @ np.linalg.inv(X) @ Y
     return S
+
+# Пример блочной матрицы 4x4
+A_example = np.array([[1, 2, 1, 0],
+                      [3, 4, 0, 1],
+                      [0, 1, 5, 6],
+                      [7, 8, 2, 3]])
 
 schur_complement_result = schur_complement(A_example)
 print(schur_complement_result)
