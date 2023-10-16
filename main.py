@@ -227,6 +227,92 @@ is_diag_zero = check_diag_A1(A_1_example)
 print(is_pos_def, is_irregular, is_diag_zero)
 
 
+r"""
+35
+Представим косообразную часть \( A_1 \) матрицы \( A \) в виде:
+\[ A_1 = K_l + K_u, \] (4)
+
+где \( K_l \) и \( K_u \) строго ниже- и верхнетреугольная матрица соответственно. Очевидно, что \( K_l = -K^*_u \).
+"""
+
+def decompose_skew_hermitian(A_1):
+    """
+    Декомпозиция косоэрмитовой матрицы A_1 на её строго нижне- и верхнетреугольные части.
+    """
+    # Строго верхнетреугольная часть
+    K_u = np.triu(A_1, 1)
+    
+    # Строго нижнетреугольная часть (с учетом свойства K_l = -K^*_u)
+    K_l = -np.conj(K_u.T)
+    
+    return K_l, K_u
+
+# Применение функции к матрице A_1_example
+K_l_example, K_u_example = decompose_skew_hermitian(A_1_example)
+
+print(K_l_example[:5, :5], K_u_example[:5, :5])  # Возвращаем первые несколько элементов для демонстрации
+
+
+r"""
+Метод ПТТКМ [5]. Пусть задано начальное приближение \( v(0) \) и положительные параметры \( h \) и \( \tau \). Для \( p = 0,1, ... \) достаточная последовательность приближений \( \{v(p)\} \) вычисляется:
+
+\[ v(p+1) = G(v, \tau)v(p) + \tau B(\omega)^{-1}b, \]
+где \( G(v, \tau) = B(\omega)^{-1}(B(\omega) - \tau A) \), \( B(\omega) \in \mathbb{C}^{n \times n} \) определяется следующим образом:
+\[ B(\omega) = (B_e + \frac{\omega}{2} K_l)^{-1}(B_e + \frac{\omega}{2} K_u). \]
+
+Здесь, \( B_e \in \mathbb{C}^{n \times n} \) — симметричная положительно определенная матрица.
+
+\[ B(\omega) \] исследован для двух параметрических методов, для которого:
+\[ B(\omega_1, \omega_2) = (B_e + \omega_1 K_l)^{-1}(B_e + \omega_2 K_u), \] (5)
+
+где \( \omega_1 \) и \( \omega_2 \) —  неотрицательные параметры, не равные нулю одновременно
+"""
+def B_omega(omega, B_e, K_l, K_u):
+    """
+    Вычисление матрицы B(ω) по заданной формуле.
+    """
+    return np.linalg.inv(B_e + (omega / 2) * K_l) @ (B_e + (omega / 2) * K_u)
+
+def B_omega_parametric(omega1, omega2, B_e, K_l, K_u):
+    """
+    Вычисление матрицы B(ω1, ω2) по заданной формуле.
+    """
+    return np.linalg.inv(B_e + omega1 * K_l) @ (B_e + omega2 * K_u)
+
+def G(v, tau, B_omega, A):
+    """
+    Вычисление матрицы G(v, τ) по заданной формуле.
+    """
+    return np.linalg.inv(B_omega) @ (B_omega - tau * A)
+
+def PTTKM_method(v0, h, tau, A, b, B_e, K_l, K_u, max_iter=100):
+    """
+    Применение метода ПТТКМ для вычисления последовательности приближений.
+    """
+    v = [v0]
+    for p in range(max_iter):
+        B_current = B_omega(h, B_e, K_l, K_u)
+        G_current = G(v[p], tau, B_current, A)
+        v_next = G_current @ v[p] + tau * np.linalg.inv(B_current) @ b
+        v.append(v_next)
+    return v
+
+# Простой пример использования
+# Начальные параметры
+n = 4
+v0 = np.array([1, 1, 1, 1])
+h = 0.1
+tau = 0.01
+B_e_example = np.eye(n)  # Просто единичная матрица в качестве примера
+
+# Применение метода
+v_sequence = PTTKM_method(v0, h, tau, A_example, \
+                          np.array([1, 2, 3, 4]), B_e_example, \
+                          K_l_example, K_u_example)
+
+# Возвращаем первые 5 элементов последовательности для демонстрации
+print(v_sequence[:5])
+
 #Третий лист
 
 #Четвертый лист
