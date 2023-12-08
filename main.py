@@ -150,27 +150,12 @@ def check_diagonal_zeros(A):
     # np.all checks if all values are True (in this case, zeros).
     return np.all(np.diag(A) == 0)
 
-# Определение матрицы системы и вектора свободных членов
-A = np.array([[1, 1], [-1, 1]], dtype=complex)
-#A = np.array([[2, 1+1j], [1-1j, 5]], dtype=complex)
-print(is_positive_definite(A))
-A_star = make_A_star(A)
-A0 = 0.5*(A + A_star)
-A1 = 0.5*(A - A_star)
-print(check_diagonal_zeros(A1))
-b = np.array([2, 0], dtype=complex)
-# Начальное приближение
-initial_v = np.array([0, 0], dtype=complex)
-# Поскольку A уже является вещественной матрицей, B_c может быть просто единичной матрицей
-B_c = np.eye(2, dtype=complex)#+A0+A
-H_0 = np.zeros((2, 2), dtype=complex)#+A1
-CONST_1 = 4
-CONST_2 = 4
-INTER = 100
-
 # Определение функции для создания 3D графика точности решения с отображением оптимальной точки
 def create_accuracy_3d_plot_with_optimal_point(A, B_c, G, B, b, initial_v, H_0, CONST_1, CONST_2, INTER):
-    omega_values = np.linspace(-CONST_1, CONST_1, INTER)
+    upper_bound = 3
+    #omega_values = np.linspace(2-0.1, 2+0.1, INTER)
+    omega_values = np.linspace(-CONST_2, CONST_2, INTER)
+    
     tau_values = np.linspace(-CONST_2, CONST_2, INTER)
 
     X, Y = np.meshgrid(omega_values, tau_values)
@@ -187,7 +172,7 @@ def create_accuracy_3d_plot_with_optimal_point(A, B_c, G, B, b, initial_v, H_0, 
                 v = iterative_solution(A, B_c, G, B, b, omega_values[i], tau_values[j], initial_v, H_0)
                 residual_norm = solution_accuracy(A, b, v)
 
-                Z[i, j] = residual_norm
+                Z[i, j] = min(max(residual_norm,0),upper_bound+0.01)
                 if residual_norm < min_residual_norm:
                     min_residual_norm = residual_norm
                     optimal_omega = omega_values[i]
@@ -201,7 +186,7 @@ def create_accuracy_3d_plot_with_optimal_point(A, B_c, G, B, b, initial_v, H_0, 
     ax = fig.add_subplot(111, projection='3d')
     surf = ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.7)
     if optimal_omega is not None and optimal_tau is not None:
-
+        pass
         # Now use these indices to get the correct Z-value
         ax.scatter(optimal_tau, optimal_omega, min_residual_norm, color='r', s=50)
         #min_residual_norm
@@ -210,16 +195,40 @@ def create_accuracy_3d_plot_with_optimal_point(A, B_c, G, B, b, initial_v, H_0, 
     ax.set_ylabel('Tau')
     ax.set_zlabel('Solution Accuracy')
     ax.set_title('Solution Accuracy with Optimal Point')
+    ax.set_zlim(0, upper_bound)  # Set the upper limit for the Z-axis
 
     print(np.nanmin(Z))
 
     return (optimal_omega, optimal_tau), optimal_v, fig
 
+def calculate_B_c(A):
+    """ Calculate the B_c matrix for given matrix A. """
+    A_star = make_A_star(A)
+    A_H = 0.5 * (A + A_star)  # Hermitian part of A
+    K_U, K_L = extract_K_matrices(A)
+    row_sums = np.sum(np.abs(A_H + K_U - K_L), axis=1)  # Sum of absolute values across rows
+    B_c = np.diag(row_sums)  # Diagonal matrix with row sums as diagonal entries
+    return B_c
+
+# Определение матрицы системы и вектора свободных членов
+#A = np.array([[1, 1], [-1, 1]], dtype=complex)
+A = np.array([[2, 1+1j], [1-1j, 5]], dtype=complex)
+print(is_positive_definite(A))
+A_star = make_A_star(A)
+A0 = 0.5*(A + A_star)
+A1 = 0.5*(A - A_star)
+print(check_diagonal_zeros(A1))
+b = np.array([2, 0], dtype=complex)
+# Начальное приближение
+initial_v = np.array([0, 0], dtype=complex)
+# Поскольку A уже является вещественной матрицей, B_c может быть просто единичной матрицей
+B_c = calculate_B_c(A)
+H_0 = np.zeros((2, 2), dtype=complex)+A#+B_c
+CONST_1 = 4
+CONST_2 = 4
+INTER = 100
 # Example usage
 (optimal_parameters, optimal_v, fig) = create_accuracy_3d_plot_with_optimal_point(A, B_c, G, compute_B_omega, b, initial_v, H_0, CONST_1, CONST_2, INTER)
-
-
-# Optimal parameters and sol
 
 #Run the parameter search
 print(f"Optimal parameters (omega, tau): {optimal_parameters}")
