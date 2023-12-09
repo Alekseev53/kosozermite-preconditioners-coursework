@@ -3,6 +3,13 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.optimize import minimize
+import warnings
+# Suppress all warnings
+warnings.filterwarnings('ignore')
+warnings.filterwarnings('ignore', category=RuntimeWarning)
+
+
 def make_A_star(A):
     # Conjugate transpose is simply the transpose of the conjugate of A
     return np.conjugate(A).T
@@ -154,9 +161,9 @@ def check_diagonal_zeros(A):
 def create_accuracy_3d_plot_with_optimal_point(A, B_c, G, B, b, initial_v, H_0, CONST_1, CONST_2, INTER):
     upper_bound = 3
     #omega_values = np.linspace(2-0.1, 2+0.1, INTER)
-    omega_values = np.linspace(-CONST_2, CONST_2, INTER)
+    omega_values = np.linspace(CONST_1[0], CONST_1[1], INTER)
     
-    tau_values = np.linspace(-CONST_2, CONST_2, INTER)
+    tau_values = np.linspace(CONST_2[0], CONST_2[1], INTER)
 
     X, Y = np.meshgrid(omega_values, tau_values)
     Z = np.zeros(X.shape)
@@ -167,7 +174,7 @@ def create_accuracy_3d_plot_with_optimal_point(A, B_c, G, B, b, initial_v, H_0, 
     optimal_v = None
 
     for i in tqdm(range(len(omega_values))):
-        for j in range(len(tau_values)):
+        for j in range(0,len(tau_values)):
             try:
                 v = iterative_solution(A, B_c, G, B, b, omega_values[i], tau_values[j], initial_v, H_0)
                 residual_norm = solution_accuracy(A, b, v)
@@ -210,6 +217,25 @@ def calculate_B_c(A):
     B_c = np.diag(row_sums)  # Diagonal matrix with row sums as diagonal entries
     return B_c
 
+def mean_percentage_error(A, b, solution):
+    """
+    Calculate the mean percentage error for the linear system Ax = b.
+
+    Parameters:
+    A (ndarray): Coefficient matrix.
+    b (ndarray): Right-hand side vector.
+    solution (ndarray): Solution vector of the system.
+
+    Returns:
+    float: The mean percentage error.
+    """
+    actual = np.dot(A, solution)
+    percentage_errors = np.abs((b - actual) / b) * 100
+    # Filter out the cases where b is zero
+    filtered_errors = [error for error, b_val in zip(percentage_errors, b) if b_val != 0]
+    return np.nanmean(filtered_errors)  # np.nanmean is used to handle division by zero
+
+
 # Определение матрицы системы и вектора свободных членов
 #A = np.array([[1, 1], [-1, 1]], dtype=complex)
 #A = np.array([[2, 1+1j], [1-1j, 5]], dtype=complex)
@@ -240,15 +266,17 @@ initial_v = np.array([0]*len(A), dtype=complex)
 # Поскольку A уже является вещественной матрицей, B_c может быть просто единичной матрицей
 B_c = calculate_B_c(A)
 H_0 = np.zeros((len(A), len(A[0])), dtype=complex)#+A#+B_c
-CONST_1 = 2
-CONST_2 = 2
-INTER = 10
+CONST_1 = (0,3)#(2.6,2.8)
+CONST_2 = (0,3)#(1.4,1.6)
+INTER = 100
 # Example usage
 (optimal_parameters, optimal_v, fig) = create_accuracy_3d_plot_with_optimal_point(A, B_c, G, compute_B_omega, b, initial_v, H_0, CONST_1, CONST_2, INTER)
+
 
 #Run the parameter search
 print(f"Optimal parameters (omega, tau): {optimal_parameters}")
 print(f"Solution with optimal parameters: {optimal_v}")
+print(f"Mean Percentage Error: {mean_percentage_error(A, b, optimal_v)}%")
 print(f"Solution accuracy: {solution_accuracy(A, b, optimal_v)}")
 #Проверка на адекватность
 solution_matrix = np.linalg.solve(A, b)
@@ -267,5 +295,32 @@ wolfram_solution = np.array([0.38835176806440036 - 0.0008584182479723201j,
 # Calculate MSE
 mse = np.mean(np.square(np.abs(optimal_v - wolfram_solution)))
 print(f"MSE between optimal_v and Wolfram solution: {mse}")
+
+print("\n\n\n-------------------------------------------------")
+
+best_solition = iterative_solution(A,B_c,G, compute_B_omega, b, optimal_parameters[0], optimal_parameters[1], initial_v, H_0, tolerance=1e-7, max_iterations=10000)
+print(f"Best Solution with optimal parameters: {best_solition}")
+print(f"Best Mean Percentage Error: {mean_percentage_error(A, b, best_solition)}%")
+print(f"Best Solution accuracy: {solution_accuracy(A, b, best_solition)}")
+print("\n\n\n-------------------------------------------------")
+
+
+def objective_function(params):
+    param1, param2 = params
+    best_solution = iterative_solution(A, B_c, G, compute_B_omega, b, param1, param2, initial_v, H_0, tolerance=1e-7, max_iterations=10000)
+    return solution_accuracy(A, b, best_solution)
+
+# Initial guesses for parameters
+init_params = [1,1]
+
+# Perform the minimization
+result = minimize(objective_function, init_params, method='BFGS')#Nelder-Mead
+# Extract the optimal parameters
+optimal_parameters = result.x
+print(f"Optimal Parameters: {optimal_parameters}")
+best_solition = iterative_solution(A,B_c,G, compute_B_omega, b, optimal_parameters[0], optimal_parameters[1], initial_v, H_0, tolerance=1e-7, max_iterations=10000)
+print(f"MINIMIZE Best Solution with optimal parameters: {best_solition}")
+print(f"MINIMIZE Best Mean Percentage Error: {mean_percentage_error(A, b, best_solition)}%")
+print(f"MINIMIZE Best Solution accuracy: {solution_accuracy(A, b, best_solition)}")
 
 plt.show()
